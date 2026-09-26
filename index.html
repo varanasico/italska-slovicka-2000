@@ -58,7 +58,7 @@
   /* ---- top bar ---- */
   .topbar{ flex:0 0 auto; }
   h1{
-    font-size:1.02rem;
+    font-size:1.1rem;
     font-weight:800;
     margin:2px 0 8px;
     text-align:center;
@@ -71,7 +71,7 @@
     margin-bottom:8px;
   }
   .mode-btn{
-    font-size:.76rem;
+    font-size:.84rem;
     padding:7px 14px;
     border-radius:20px;
     background:transparent;
@@ -89,7 +89,7 @@
     display:flex;
     align-items:center;
     gap:8px;
-    font-size:.74rem;
+    font-size:.82rem;
     color:var(--muted);
     margin-bottom:6px;
   }
@@ -135,13 +135,13 @@
   }
   .card:active{ transform: scale(0.99); }
   .word{
-    font-size:clamp(1.8rem, 8vw, 2.3rem);
+    font-size:clamp(2.2rem, 10vw, 2.9rem);
     font-weight:800;
     color:var(--accent);
     line-height:1.15;
   }
-  .hint{ color:var(--muted); font-size:.8rem; }
-  .swipe-hint{ color:var(--muted); font-size:.72rem; margin-top:2px; }
+  .hint{ color:var(--muted); font-size:.92rem; }
+  .swipe-hint{ color:var(--muted); font-size:.8rem; margin-top:2px; }
   .back{
     display:none;
     width:100%;
@@ -154,7 +154,7 @@
   .front.hide{ display:none; }
   .meaning{
     text-align:center;
-    font-size:1.25rem;
+    font-size:1.5rem;
     font-weight:700;
     color:var(--text);
   }
@@ -164,8 +164,8 @@
     border-radius:12px;
     padding:10px 13px;
   }
-  .example .it{ font-style:italic; color:var(--text); font-size:1rem; }
-  .example .cz{ color:var(--muted); font-size:.88rem; margin-top:3px; }
+  .example .it{ font-style:italic; color:var(--text); font-size:1.15rem; }
+  .example .cz{ color:var(--muted); font-size:1.02rem; margin-top:3px; }
 
   /* ---- bottom controls (thumb reach) ---- */
   .controls{
@@ -178,7 +178,7 @@
   button{
     border:none;
     border-radius:14px;
-    font-size:.92rem;
+    font-size:1.02rem;
     font-weight:700;
     cursor:pointer;
     background:var(--card-bg);
@@ -198,13 +198,32 @@
     min-height:52px;
     padding:10px 6px;
   }
-  .controls button.side{ flex:0 0 30%; font-size:.82rem; }
+  .controls button.side{ flex:0 0 30%; font-size:.92rem; }
   button.primary{
     background:var(--accent);
     color:#fff;
     border-color:var(--accent-dark);
     flex:0 0 40%;
-    font-size:1rem;
+    font-size:1.08rem;
+  }
+
+  /* ---- landscape: shorter chrome, bigger text ---- */
+  @media (orientation: landscape){
+    .app{ max-width:900px; padding-top: calc(var(--safe-t) + 6px); padding-bottom: calc(var(--safe-b) + 6px); }
+    h1{ font-size:1rem; margin:0 0 6px; }
+    .mode-row{ margin-bottom:6px; }
+    .mode-btn{ padding:5px 12px; font-size:.8rem; }
+    .progress-row{ margin-bottom:6px; }
+    .card{ padding:18px 34px; gap:16px; }
+    .back{ margin:0; }
+    .word{ font-size:clamp(2.6rem, 7vw, 4rem); }
+    .hint{ font-size:1rem; }
+    .swipe-hint{ font-size:.86rem; }
+    .meaning{ font-size:1.9rem; }
+    .example .it{ font-size:1.4rem; }
+    .example .cz{ font-size:1.2rem; }
+    .example{ padding:12px 16px; }
+    .controls button{ min-height:46px; }
   }
 </style>
 </head>
