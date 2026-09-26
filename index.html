@@ -68,7 +68,8 @@
     display:flex;
     justify-content:center;
     gap:6px;
-    margin-bottom:8px;
+    margin-bottom:6px;
+    flex-wrap:wrap;
   }
   .mode-btn{
     font-size:.84rem;
@@ -166,6 +167,20 @@
   }
   .example .it{ font-style:italic; color:var(--text); font-size:1.15rem; }
   .example .cz{ color:var(--muted); font-size:1.02rem; margin-top:3px; }
+  .sentence-source{
+    text-align:center;
+    color:var(--muted);
+    font-size:.85rem;
+    padding-top:2px;
+    border-top:1px solid var(--card-border);
+  }
+  .word.is-sentence{
+    font-size:clamp(1.35rem, 6.5vw, 1.9rem);
+    font-style:italic;
+    font-weight:700;
+    color:var(--text);
+    line-height:1.3;
+  }
 
   /* ---- bottom controls (thumb reach) ---- */
   .controls{
@@ -211,18 +226,20 @@
   @media (orientation: landscape){
     .app{ max-width:900px; padding-top: calc(var(--safe-t) + 6px); padding-bottom: calc(var(--safe-b) + 6px); }
     h1{ font-size:1rem; margin:0 0 6px; }
-    .mode-row{ margin-bottom:6px; }
-    .mode-btn{ padding:5px 12px; font-size:.8rem; }
+    .mode-row{ margin-bottom:4px; }
+    .mode-btn{ padding:4px 12px; font-size:.78rem; }
     .progress-row{ margin-bottom:6px; }
-    .card{ padding:18px 34px; gap:16px; }
+    .card{ padding:16px 34px; gap:12px; }
     .back{ margin:0; }
     .word{ font-size:clamp(2.6rem, 7vw, 4rem); }
+    .word.is-sentence{ font-size:clamp(1.5rem, 4.5vw, 2.4rem); }
     .hint{ font-size:1rem; }
     .swipe-hint{ font-size:.86rem; }
     .meaning{ font-size:1.9rem; }
     .example .it{ font-size:1.4rem; }
     .example .cz{ font-size:1.2rem; }
     .example{ padding:12px 16px; }
+    .sentence-source{ font-size:.95rem; }
     .controls button{ min-height:46px; }
   }
 </style>
@@ -233,6 +250,14 @@
 
   <div class="topbar">
     <h1>🇮🇹 Italská slovíčka</h1>
+    <div class="mode-row">
+      <button class="mode-btn active" id="typeWords" type="button">🔤 Slovíčka</button>
+      <button class="mode-btn" id="typeSentences" type="button">💬 Věty</button>
+    </div>
+    <div class="mode-row" id="dirRow" style="display:none">
+      <button class="mode-btn active" id="dirItCz" type="button">🇮🇹→🇨🇿 italsky nejdřív</button>
+      <button class="mode-btn" id="dirCzIt" type="button">🇨🇿→🇮🇹 česky nejdřív</button>
+    </div>
     <div class="mode-row">
       <button class="mode-btn active" id="modeRandom" type="button">🔀 Náhodně</button>
       <button class="mode-btn" id="modeSeq" type="button">📖 Podle pořadí</button>
@@ -247,12 +272,12 @@
     <div class="card" id="card">
       <div class="front" id="front">
         <div class="word" id="wordText"></div>
-        <div class="hint">ťukni pro překlad a věty</div>
+        <div class="hint" id="hintText">ťukni pro překlad a věty</div>
         <div class="swipe-hint">← swipe → pro další slovo</div>
       </div>
       <div class="back" id="back">
         <div class="meaning" id="meaningText"></div>
-        <div class="examples">
+        <div class="examples" id="examplesBlock">
           <div class="example">
             <div class="it" id="s1"></div>
             <div class="cz" id="t1"></div>
@@ -262,13 +287,14 @@
             <div class="cz" id="t2"></div>
           </div>
         </div>
+        <div class="sentence-source" id="sentenceSource" style="display:none"></div>
       </div>
     </div>
   </div>
 
   <div class="controls">
     <button class="side" id="prevBtn" type="button">←</button>
-    <button class="primary" id="refreshBtn" type="button">🔄 Nové slovo</button>
+    <button class="primary" id="refreshBtn" type="button">🔄 Nové</button>
     <button class="side" id="nextBtn" type="button">→</button>
   </div>
 
@@ -278,34 +304,53 @@
 <script>
 (function(){
   var WORDS = JSON.parse(document.getElementById('data').textContent);
-  var TOTAL = WORDS.length;
 
-  var mode = 'random'; // 'random' | 'seq'
-  var seqIndex = 0;
-  var current = null;
+  // flatten the two example sentences of every word into one flashcard-able list
+  var SENTENCES = [];
+  WORDS.forEach(function(w){
+    SENTENCES.push({ n: SENTENCES.length + 1, it: w.s1, cz: w.t1, w: w.w, m: w.m });
+    SENTENCES.push({ n: SENTENCES.length + 1, it: w.s2, cz: w.t2, w: w.w, m: w.m });
+  });
+
+  var contentType = 'words';   // 'words' | 'sentences'
+  var direction = 'it2cz';     // 'it2cz' | 'cz2it' (sentences mode only)
+  var mode = 'random';         // 'random' | 'seq'
+  var curIndex = 0;
   var flipped = false;
 
   var elCard = document.getElementById('card');
   var elFront = document.getElementById('front');
   var elBack = document.getElementById('back');
   var elWord = document.getElementById('wordText');
+  var elHint = document.getElementById('hintText');
   var elMeaning = document.getElementById('meaningText');
+  var elExamples = document.getElementById('examplesBlock');
   var elS1 = document.getElementById('s1');
   var elT1 = document.getElementById('t1');
   var elS2 = document.getElementById('s2');
   var elT2 = document.getElementById('t2');
+  var elSource = document.getElementById('sentenceSource');
   var elRank = document.getElementById('rankBadge');
   var elFill = document.getElementById('progressFill');
   var elPrev = document.getElementById('prevBtn');
   var elNext = document.getElementById('nextBtn');
   var elRefresh = document.getElementById('refreshBtn');
+  var elTypeWords = document.getElementById('typeWords');
+  var elTypeSentences = document.getElementById('typeSentences');
+  var elDirRow = document.getElementById('dirRow');
+  var elDirItCz = document.getElementById('dirItCz');
+  var elDirCzIt = document.getElementById('dirCzIt');
   var elModeRandom = document.getElementById('modeRandom');
   var elModeSeq = document.getElementById('modeSeq');
 
+  function activeList(){ return contentType === 'words' ? WORDS : SENTENCES; }
+  function activeTotal(){ return activeList().length; }
+
   function randomIndex(excludeIndex){
-    if (TOTAL <= 1) return 0;
+    var total = activeTotal();
+    if (total <= 1) return 0;
     var i;
-    do { i = Math.floor(Math.random() * TOTAL); } while (i === excludeIndex);
+    do { i = Math.floor(Math.random() * total); } while (i === excludeIndex);
     return i;
   }
 
@@ -316,33 +361,51 @@
     elCard.scrollTop = 0;
   }
 
-  function showWordAtIndex(idx, resetFlip){
-    idx = Math.max(0, Math.min(TOTAL - 1, idx));
-    seqIndex = idx;
-    current = WORDS[idx];
-    elWord.textContent = current.w;
-    elMeaning.textContent = current.m;
-    elS1.textContent = current.s1;
-    elT1.textContent = current.t1;
-    elS2.textContent = current.s2;
-    elT2.textContent = current.t2;
-    elRank.textContent = '#' + current.r + ' / ' + TOTAL;
-    elFill.style.width = (current.r / TOTAL * 100).toFixed(1) + '%';
+  function renderAtIndex(idx, resetFlip){
+    var total = activeTotal();
+    idx = Math.max(0, Math.min(total - 1, idx));
+    curIndex = idx;
+
+    if (contentType === 'words') {
+      var w = WORDS[idx];
+      elWord.classList.remove('is-sentence');
+      elWord.textContent = w.w;
+      elHint.textContent = 'ťukni pro překlad a věty';
+      elMeaning.textContent = w.m;
+      elS1.textContent = w.s1;
+      elT1.textContent = w.t1;
+      elS2.textContent = w.s2;
+      elT2.textContent = w.t2;
+      elExamples.style.display = '';
+      elSource.style.display = 'none';
+      elRank.textContent = '#' + w.r + ' / ' + total;
+      elFill.style.width = (w.r / total * 100).toFixed(1) + '%';
+    } else {
+      var s = SENTENCES[idx];
+      var front = direction === 'it2cz' ? s.it : s.cz;
+      var back = direction === 'it2cz' ? s.cz : s.it;
+      elWord.classList.add('is-sentence');
+      elWord.textContent = front;
+      elHint.textContent = 'ťukni pro překlad';
+      elMeaning.textContent = back;
+      elExamples.style.display = 'none';
+      elSource.style.display = '';
+      elSource.textContent = 'ze slova „' + s.w + '“ (' + s.m + ')';
+      elRank.textContent = '#' + s.n + ' / ' + total;
+      elFill.style.width = (s.n / total * 100).toFixed(1) + '%';
+    }
     if (resetFlip !== false) setFlipped(false);
   }
 
-  function showRandom(){
-    var idx = randomIndex(seqIndex);
-    showWordAtIndex(idx, true);
-  }
+  function showRandom(){ renderAtIndex(randomIndex(curIndex), true); }
 
   function goNext(){
-    if (mode === 'seq') showWordAtIndex((seqIndex + 1) % TOTAL, true);
+    if (mode === 'seq') renderAtIndex((curIndex + 1) % activeTotal(), true);
     else showRandom();
   }
 
   function goPrev(){
-    if (mode === 'seq') showWordAtIndex((seqIndex - 1 + TOTAL) % TOTAL, true);
+    if (mode === 'seq') renderAtIndex((curIndex - 1 + activeTotal()) % activeTotal(), true);
     else showRandom();
   }
 
@@ -352,15 +415,34 @@
     elModeSeq.classList.toggle('active', mode === 'seq');
   }
 
+  function setContentType(t){
+    contentType = t;
+    elTypeWords.classList.toggle('active', t === 'words');
+    elTypeSentences.classList.toggle('active', t === 'sentences');
+    elDirRow.style.display = t === 'sentences' ? '' : 'none';
+    renderAtIndex(randomIndex(-1), true);
+  }
+
+  function setDirection(d){
+    direction = d;
+    elDirItCz.classList.toggle('active', d === 'it2cz');
+    elDirCzIt.classList.toggle('active', d === 'cz2it');
+    renderAtIndex(curIndex, true);
+  }
+
   elCard.addEventListener('click', function(){ setFlipped(!flipped); });
   elRefresh.addEventListener('click', function(){
-    if (mode === 'seq') showWordAtIndex((seqIndex + 1) % TOTAL, true);
+    if (mode === 'seq') renderAtIndex((curIndex + 1) % activeTotal(), true);
     else showRandom();
   });
   elNext.addEventListener('click', goNext);
   elPrev.addEventListener('click', goPrev);
   elModeRandom.addEventListener('click', function(){ setMode('random'); });
-  elModeSeq.addEventListener('click', function(){ setMode('seq'); showWordAtIndex(seqIndex, true); });
+  elModeSeq.addEventListener('click', function(){ setMode('seq'); renderAtIndex(curIndex, true); });
+  elTypeWords.addEventListener('click', function(){ setContentType('words'); });
+  elTypeSentences.addEventListener('click', function(){ setContentType('sentences'); });
+  elDirItCz.addEventListener('click', function(){ setDirection('it2cz'); });
+  elDirCzIt.addEventListener('click', function(){ setDirection('cz2it'); });
 
   document.addEventListener('keydown', function(e){
     if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); setFlipped(!flipped); }
@@ -370,14 +452,13 @@
   });
 
   // --- swipe gestures (mobile): swipe left/right = next/previous, tap = flip ---
-  var touchStartX = 0, touchStartY = 0, touchStartScrollTop = 0;
+  var touchStartX = 0, touchStartY = 0;
   var SWIPE_THRESHOLD = 55;
 
   elCard.addEventListener('touchstart', function(e){
     var t = e.changedTouches[0];
     touchStartX = t.clientX;
     touchStartY = t.clientY;
-    touchStartScrollTop = elCard.scrollTop;
   }, { passive: true });
 
   elCard.addEventListener('touchend', function(e){
@@ -393,7 +474,7 @@
   }, { passive: false });
 
   setMode('random');
-  showWordAtIndex(randomIndex(-1), true);
+  renderAtIndex(randomIndex(-1), true);
 })();
 </script>
 </body>
